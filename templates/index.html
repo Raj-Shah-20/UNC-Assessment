@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Research AI Explorer</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="container upload-page">
+    <form id="upload-form" action="/dashboard" method="POST" enctype="multipart/form-data">
+        <label class="upload-label">
+            <input type="file" name="file" accept=".csv" required id="file-input">
+        </label>
+    </form>
+    <p class="demo-link"><a href="/demo">Load demo cohort (30 subjects · multimodal sensors)</a></p>
+    <div id="loading" class="loading" hidden></div>
+</div>
+
+<script>
+document.getElementById('file-input').addEventListener('change', function () {
+    if (!this.files.length) return;
+    document.getElementById('loading').hidden = false;
+    document.getElementById('upload-form').submit();
+});
+</script>
+
+</body>
+</html>

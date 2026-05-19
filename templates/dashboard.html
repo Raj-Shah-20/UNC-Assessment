@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Research AI Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.plot.ly/plotly-2.35.3.min.js" charset="utf-8"></script>
+</head>
+<body>
+
+{% macro viz_pair(content, insight_key, size='wide', flip=false, is_table=false) %}
+    {% if content %}
+    <div class="viz-row">
+        <div class="viz-chart">
+            <div class="{% if is_table %}table-card{% elif size == 'roc' %}chart-card chart-card--roc{% else %}chart-card chart-card--{{ size }}{% endif %}">
+                {{ content | safe }}
+            </div>
+        </div>
+        <div class="viz-insight">
+            <span class="insight-label">In plain terms</span>
+            {% if chart_insights and chart_insights.get(insight_key) %}
+            <p>{{ chart_insights[insight_key] }}</p>
+            {% else %}
+            <p class="insight-placeholder">Insight will appear when AI summaries are enabled.</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+{% endmacro %}
+
+<div id="page-loading" class="page-loading" hidden></div>
+
+<div class="container">
+
+    {% set display_names = sensor_display_names|default({}) %}
+
+    <form id="dashboard-form" class="controls-panel" action="/dashboard" method="POST" enctype="multipart/form-data">
+
+        <div class="controls-row">
+            <label class="upload-label">
+                <span class="control-label">CSV</span>
+                <input type="file" name="file" accept=".csv" id="file-input">
+            </label>
+        </div>
+
+        <div class="controls-row core-row">
+            <span class="control-label">Core</span>
+            <div class="tag-list">
+                {% for col in core_fields_present %}
+                <span class="tag tag-core">{{ col }}</span>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if glossary %}
+        <details class="glossary-panel" open>
+            <summary>Label guide</summary>
+            <dl class="glossary-list">
+                {% for code, desc in glossary.diagnosis.items() %}
+                <dt>{{ code }}</dt><dd>{{ desc }}</dd>
+                {% endfor %}
+                {% for code, desc in glossary.behavior.items() %}
+                <dt>{{ code }}</dt><dd>{{ desc }}</dd>
+                {% endfor %}
+            </dl>
+        </details>
+        {% endif %}
+
+        <div class="controls-row columns-row">
+            <span class="control-label">Sensors</span>
+            <div class="column-checkboxes">
+                {% for col in model_feature_columns %}
+                <label class="col-check {% if col in active_features %}is-on{% else %}is-off{% endif %}"
+                    {% if glossary and glossary.features.get(col) %}title="{{ glossary.features[col] }}"{% endif %}>
+                    <input type="checkbox" name="columns" value="{{ col }}"
+                        {% if col in active_features %}checked{% endif %}>
+                    {{ display_names.get(col, col) }}
+                </label>
+                {% endfor %}
+            </div>
+            {% if inactive_features %}
+            <span class="off-note">Off: {% for c in inactive_features %}{{ display_names.get(c, c) }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+            {% endif %}
+        </div>
+
+        <div class="controls-row params-row">
+            <label>
+                <span class="control-label">Threshold</span>
+                <input type="range" name="decision_threshold" min="0.1" max="0.9" step="0.05"
+                    value="{{ params.decision_threshold }}">
+                <span class="param-val">{{ params.decision_threshold }}</span>
+            </label>
+            <label>
+                <span class="control-label">C</span>
+                <select name="regularization_c">
+                    {% for c in [0.01, 0.1, 1.0, 10.0] %}
+                    <option value="{{ c }}" {% if params.regularization_c|float == c|float %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span class="control-label">Impute</span>
+                <select name="imputation">
+                    {% for s in ['mean', 'median', 'zero'] %}
+                    <option value="{{ s }}" {% if params.imputation == s %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+
+    </form>
+
+    {% if study_overview %}
+    <div class="overview-card">{{ study_overview }}</div>
+    {% endif %}
+
+    <section class="dashboard-section">
+        <header class="section-header">
+            <h2>Data Visualization</h2>
+            <p class="section-desc">Explore sensor readings, missing data, and how participants group by diagnosis and visit.</p>
+        </header>
+        <div class="section-body">
+            {{ viz_pair(histogram_plot, 'histogram', 'wide', false) }}
+            {{ viz_pair(bell_curve_plot, 'bell_curve', 'wide', true) }}
+            {{ viz_pair(visit_comparison_plot, 'visit_comparison', 'wide', false) }}
+            {{ viz_pair(sensor_boxplot, 'sensor_boxplot', 'wide', true) }}
+            {{ viz_pair(behavior_sensor_plot, 'behavior_sensors', 'medium', false) }}
+            {{ viz_pair(missing_by_visit_plot, 'missing_by_visit', 'medium', true) }}
+            {{ viz_pair(correlation_heatmap, 'correlation_heatmap', 'medium', false) }}
+            {{ viz_pair(label_charts, 'labels', 'medium', true) }}
+            {{ viz_pair(missingness_table, 'missingness_table', 'medium', false, true) }}
+        </div>
+    </section>
+
+    <section class="dashboard-section">
+        <header class="section-header">
+            <h2>Model Results</h2>
+            <p class="section-desc">How the support model compares to recorded diagnoses on this dataset.</p>
+        </header>
+        <div class="section-body">
+            {% if model_message %}
+            <div class="card status-card">{{ model_message }}</div>
+            {% endif %}
+
+            {{ viz_pair(classification_metrics_table, 'classification_metrics', 'medium', false, true) }}
+            {{ viz_pair(threshold_sensitivity_table, 'threshold_sensitivity', 'medium', true, true) }}
+            {{ viz_pair(confusion_matrix_plot, 'confusion_matrix', 'square', false) }}
+            {{ viz_pair(roc_plot, 'roc_curve', 'roc', true) }}
+            {{ viz_pair(confidence_plot, 'model_outputs', 'medium', false) }}
+            {{ viz_pair(misclassification_plot, 'model_misclassifications', 'medium', true) }}
+        </div>
+    </section>
+
+</div>
+
+<script>
+(function () {
+    const form = document.getElementById('dashboard-form');
+    const loading = document.getElementById('page-loading');
+    let debounceTimer = null;
+
+    function showLoading() {
+        loading.hidden = false;
+    }
+
+    function runModel() {
+        const checked = form.querySelectorAll('input[name="columns"]:checked');
+        if (checked.length === 0) return;
+        showLoading();
+        form.submit();
+    }
+
+    document.getElementById('file-input').addEventListener('change', function () {
+        if (this.files.length) runModel();
+    });
+
+    form.querySelectorAll('input[name="columns"]').forEach(function (box) {
+        box.addEventListener('change', function () {
+            const checked = form.querySelectorAll('input[name="columns"]:checked');
+            if (checked.length === 0) {
+                this.checked = true;
+                return;
+            }
+            runModel();
+        });
+    });
+
+    form.querySelectorAll('input[type="range"]').forEach(function (slider) {
+        const val = slider.parentElement.querySelector('.param-val');
+        slider.addEventListener('input', function () {
+            if (val) val.textContent = slider.value;
+        });
+        slider.addEventListener('change', function () {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(runModel, 200);
+        });
+    });
+
+    form.querySelectorAll('select').forEach(function (sel) {
+        sel.addEventListener('change', runModel);
+    });
+
+    if (window.Plotly) {
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                document.querySelectorAll('.plotly-graph-div').forEach(function(plot) {
+                    try {
+                        Plotly.Plots.resize(plot);
+                    } catch(e) {}
+                });
+            }, 200);
+        });
+    }
+})();
+</script>
+
+</body>
+</html>
