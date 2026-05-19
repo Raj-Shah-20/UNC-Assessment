@@ -96,15 +96,7 @@ Re-run after changing the synthetic recipe: `python data_generator.py`
 
 ```bash
 OPENAI_API_KEY=sk-...          # optional
-OPENAI_MODEL=gpt-4o-mini       # optional
+OPENAI_MODEL=gpt-5.4-nano       # optional
 ENABLE_LLM_INSIGHTS=true       # set false for offline fallbacks
-SECRET_KEY=change-me           # Flask session
 PORT=5000                      # optional
 ```
-
-## Interview tips
-
-- Lead with **Data Visualization** + “In plain terms” for clinical framing.  
-- Use **Model Results** + threshold table for “no single agreed metric.”  
-- Mention tradeoffs: removed PCA/heatmaps for clarity; kept multi-metric validation for researchers.  
-- Point reviewers to `SUBMISSION_SUMMARY.md` for written reasoning.
